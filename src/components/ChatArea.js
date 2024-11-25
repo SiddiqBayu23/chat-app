@@ -1,53 +1,110 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { ref, push, onValue } from 'firebase/database';
+import { database } from '../Firebase/firebase';
 
-const ChatArea = ({ contact }) => {
+const ChatArea = ({ room }) => {
   const [message, setMessage] = useState('');
+  const [messages, setMessages] = useState([]);
 
-  // Handle sending message
+  
+  useEffect(() => {
+    const messagesRef = ref(database, `rooms/${room.id}/messages`);
+    onValue(messagesRef, (snapshot) => {
+      const data = snapshot.val();
+      const messagesArray = Object.entries(data || {}).map(([key, value]) => ({
+        id: key,
+        ...value,
+      }));
+      setMessages(messagesArray);
+    });
+  }, [room.id]);
+
+  
+  const sendMessageToFirebase = (msg) => {
+    const messagesRef = ref(database, `rooms/${room.id}/messages`);
+    push(messagesRef, msg)
+      .then(() => console.log("Message sent to Firebase:", msg))
+      .catch((error) => console.error("Error sending message:", error));
+  };
+
+  
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!message.trim()) return;
 
-    // Add user message to chat
-    const newMessages = [...contact.messages, { sender: 'You', text: message }];
-    contact.messages = newMessages; // Update the messages
+    const customerMessage = {
+      type: 'text',
+      message,
+      sender: 'You',
+      timestamp: Date.now(),
+    };
 
-    setMessage(''); // Clear input field
+    sendMessageToFirebase(customerMessage);
+    setMessage('');
+
+    // Simulate automatic response from Customer Service
+    setTimeout(() => {
+      const csMessage = {
+        type: 'text',
+        sender: 'Customer Service',
+        timestamp: Date.now(),
+        message: message.toLowerCase().includes('pembayaran')
+          ? 'Baik, silahkan kirimkan lampiran bukti pembayarannya.'
+          : 'Ada yang bisa saya bantu?',
+      };
+
+      sendMessageToFirebase(csMessage);
+    }, 1000);
   };
 
   return (
-    <div className="col-9 bg-white p-4 d-flex flex-column">
-      <div className="d-flex align-items-center mb-3">
+    <div
+      className="col-9 d-flex flex-column bg-white p-4"
+      style={{ height: '100vh' }} // Full viewport height
+    >
+      {/* Room Header */}
+      <div className="d-flex align-items-center mb-3 border-bottom pb-2">
         <img
-          src={contact.image}
-          alt={contact.name}
+          src={room.image_url}
+          alt={room.name}
           className="rounded-circle"
           width="50"
           height="50"
         />
-        <h5 className="ms-3 mb-0">{contact.name}</h5>
+        <h5 className="ms-3">{room.name}</h5>
       </div>
 
-      {/* Chat Messages */}
-      <div className="flex-grow-1 overflow-auto mb-3">
-        {contact.messages.map((msg, index) => (
+      {/* Messages Area */}
+      <div
+        className="flex-grow-1 overflow-auto mb-3"
+        style={{
+          backgroundColor: '#f8f9fa',
+          borderRadius: '8px',
+          padding: '10px',
+        }}
+      >
+        {messages.map((msg) => (
           <div
-            key={index}
-            className={`d-flex ${msg.sender === 'You' ? 'justify-content-end' : 'justify-content-start'} mb-2`}
+            key={msg.id}
+            className={`d-flex ${
+              msg.sender === 'You' ? 'justify-content-end' : 'justify-content-start'
+            } mb-2`}
           >
             <div
-              className={`p-2 rounded ${msg.sender === 'You' ? 'bg-primary text-white' : 'bg-light'}`}
+              className={`p-2 rounded ${
+                msg.sender === 'You' ? 'bg-primary text-white' : 'bg-light'
+              }`}
               style={{ maxWidth: '75%' }}
             >
-              <small className="d-block text-muted mb-1">{msg.sender}</small>
-              <span>{msg.text}</span>
+              <small className="d-block text-muted">{msg.sender}</small>
+              <span>{msg.message}</span>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Input box */}
-      <form onSubmit={handleSendMessage}>
+      {/* Message Input */}
+      <form onSubmit={handleSendMessage} className="mt-auto">
         <div className="input-group">
           <input
             type="text"

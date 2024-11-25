@@ -1,40 +1,46 @@
-import React, { useState } from 'react';
-import Sidebar from './components/Sidebar';
-import ChatArea from './components/ChatArea';  // ChatArea Component
-
+import React, { useState, useEffect } from "react";
+import Sidebar from "./components/Sidebar";
+import ChatArea from "./components/ChatArea";
+import { database } from "./Firebase/firebase"; 
+import { ref, onValue } from "firebase/database"; 
 
 const App = () => {
-  const [currentChat, setCurrentChat] = useState(null);
+  const [rooms, setRooms] = useState({});
+  const [currentRoom, setCurrentRoom] = useState(null);
 
-  const contacts = [
-    { id: 1, name: 'Alice', image: 'https://placehold.co/50x50' },
-    { id: 2, name: 'Bob', image: 'https://placehold.co/50x50' },
-  ];
-
-  // Simulasi data chat berdasarkan kontak yang dipilih
-  const chatData = {
-    Alice: [
-      { sender: 'Alice', text: 'Hi, how are you?' },
-      { sender: 'You', text: 'I\'m good, thanks!' },
-    ],
-    Bob: [
-      { sender: 'Bob', text: 'How\'s it going?' },
-      { sender: 'You', text: 'All good, and you?' },
-    ],
-  };
-
-  // Mengambil chat berdasarkan kontak yang dipilih
-  const handleSetCurrentChat = (contact) => {
-    setCurrentChat({
-      ...contact,
-      messages: chatData[contact.name] || [],
+  useEffect(() => {
+    const roomsRef = ref(database, "rooms"); // Path Firebase Anda
+    onValue(roomsRef, (snapshot) => {
+      const data = snapshot.val();
+      console.log(data); 
+      setRooms(data || {});
     });
+  }, []);
+
+  const handleSetCurrentRoom = (roomId) => {
+    const selectedRoom = rooms[roomId];
+    if (selectedRoom) {
+      setCurrentRoom({
+        ...selectedRoom,
+        id: roomId,
+        messages: Object.entries(selectedRoom.messages || {}).map(
+          ([key, value]) => ({
+            id: key,
+            ...value,
+          })
+        ),
+      });
+    }
   };
 
   return (
     <div className="d-flex">
-      <Sidebar contacts={contacts} setCurrentChat={handleSetCurrentChat} />
-      {currentChat ? <ChatArea contact={currentChat} /> : <div className="col-9 p-4">Select a contact to start chatting</div>}
+      <Sidebar rooms={rooms} setCurrentRoom={handleSetCurrentRoom} />
+      {currentRoom ? (
+        <ChatArea room={currentRoom} />
+      ) : (
+        <div className="col-9 p-4">Select a room to start chatting</div>
+      )}
     </div>
   );
 };
